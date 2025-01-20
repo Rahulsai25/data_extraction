@@ -1,16 +1,16 @@
-# Q&A Chatbot
-#from langchain.llms import OpenAI
 
-from dotenv import load_dotenv
-
-load_dotenv()  
 
 import streamlit as st
 import os
 import pathlib
 import textwrap
 from PIL import Image
+# Q&A Chatbot
+#from langchain.llms import OpenAI
 
+from dotenv import load_dotenv
+
+load_dotenv()  
 
 import google.generativeai as genai
 
