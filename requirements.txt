@@ -7,5 +7,4 @@ chromadb
 faiss-cpu
 google-generativeai
 google-ai-generativelanguage
-google-generative-ai
 google-cloud-aiplatform
