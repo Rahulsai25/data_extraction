@@ -1,3 +1,4 @@
 # Ignore .env and credential files
 .env
 *.json
+/Users/rahulsai/Downloads/gen-ai-model-deployment-8b561c1af685.json
