@@ -4,7 +4,10 @@ import pathlib
 import textwrap
 from PIL import Image
 from dotenv import load_dotenv
+import boto3
+from datetime import datetime
 
+# Load environment variables
 load_dotenv()
 
 import google.generativeai as genai
@@ -18,12 +21,13 @@ print(f"API Key: {api_key}")  # For debugging
 # Configure API
 genai.configure(api_key=api_key)
 
-## Function to load OpenAI model and get responses
+## Function to load Gemini AI model and get responses
 def get_gemini_response(input, image, prompt):
     model = genai.GenerativeModel('gemini-1.5-flash')
     response = model.generate_content([input, image[0], prompt])
     return response.text
 
+## Function to process uploaded images
 def input_image_setup(uploaded_file):
     if uploaded_file is not None:
         bytes_data = uploaded_file.getvalue()
@@ -36,6 +40,15 @@ def input_image_setup(uploaded_file):
         return image_parts
     else:
         raise FileNotFoundError("No file uploaded")
+
+## Function to upload data to S3
+def upload_to_s3(bucket_name, file_name, data):
+    try:
+        s3 = boto3.client('s3')
+        s3.put_object(Bucket=bucket_name, Key=file_name, Body=data)
+        print(f"File {file_name} successfully uploaded to {bucket_name}")
+    except Exception as e:
+        print(f"Error uploading to S3: {e}")
 
 ## Initializing Streamlit app
 st.set_page_config(page_title="Gemini Image Demo")
@@ -57,7 +70,24 @@ input_prompt = """
                """
 
 if submit:
-    image_data = input_image_setup(uploaded_file)
-    response = get_gemini_response(input_prompt, image_data, input)
-    st.subheader("The Response is")
-    st.write(response)
+    try:
+        # Process the uploaded image
+        image_data = input_image_setup(uploaded_file)
+        
+        # Get the Gemini AI response
+        response = get_gemini_response(input_prompt, image_data, input)
+        
+        # Display the response in the app
+        st.subheader("The Response is")
+        st.write(response)
+        
+        # Save response to S3
+        bucket_name = "gemini-app-responses"  # Replace with your S3 bucket name
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        file_name = f"response_{timestamp}.txt"
+        upload_to_s3(bucket_name, file_name, response)
+        
+        # Show success message
+        st.success(f"Response saved to S3 bucket: {bucket_name}, File: {file_name}")
+    except Exception as e:
+        st.error(f"Error: {e}")
