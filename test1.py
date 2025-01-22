@@ -1,15 +1,11 @@
 import streamlit as st
 import os
-import pathlib
-import textwrap
+import json
+import boto3
 from PIL import Image
 from dotenv import load_dotenv
-import boto3
-import hashlib
 from datetime import datetime
 
-
-# Load environment variables
 load_dotenv()
 
 import google.generativeai as genai
@@ -23,16 +19,12 @@ print(f"API Key: {api_key}")  # For debugging
 # Configure API
 genai.configure(api_key=api_key)
 
-## Function to load Gemini AI model and get responses
+## Function to load OpenAI model and get responses
 def get_gemini_response(input, image, prompt):
-    try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content([input, image[0], prompt])
-        return response.text
-    except Exception as e:
-        raise ValueError(f"Error generating response from Gemini AI: {e}")
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    response = model.generate_content([input, image[0], prompt])
+    return response.text
 
-## Function to process uploaded images
 def input_image_setup(uploaded_file):
     if uploaded_file is not None:
         bytes_data = uploaded_file.getvalue()
@@ -46,18 +38,26 @@ def input_image_setup(uploaded_file):
     else:
         raise FileNotFoundError("No file uploaded")
 
-## Function to upload data to S3
-def upload_to_s3(bucket_name, file_name, data, profile_name="Rahulsai"):
+# Function to upload file to S3
+def upload_to_s3(file_data, bucket_name="gemini-app-responses", s3_key="data/data1.json"):
     try:
-        # Create a session using the specified profile
-        session = boto3.Session(profile_name=profile_name)
-        s3 = session.client('s3')
+        # Initialize boto3 client
+        s3_client = boto3.client('s3')
+
+        # Create the file locally (JSON format)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        file_path = f"response_{timestamp}.json"
         
-        # Upload the data to the S3 bucket
-        s3.put_object(Bucket=bucket_name, Key=file_name, Body=data)
-        print(f"File {file_name} successfully uploaded to {bucket_name}")
+        # Save the response as a JSON file
+        with open(file_path, 'w') as json_file:
+            json.dump(file_data, json_file)
+        
+        # Upload to S3
+        s3_client.upload_file(file_path, bucket_name, s3_key)
+        
+        print(f"File {file_path} uploaded successfully to {bucket_name} with key {s3_key}.")
     except Exception as e:
-        raise ValueError(f"Error uploading to S3: {e}")
+        print(f"Error uploading file to S3: {e}")
 
 ## Initializing Streamlit app
 st.set_page_config(page_title="Gemini Image Demo")
@@ -80,33 +80,26 @@ input_prompt = """
 
 if submit:
     try:
-        # Process the uploaded image
         image_data = input_image_setup(uploaded_file)
         
         # Get the Gemini AI response
-        response = get_gemini_response(input_prompt, image_data, input)
+        response_text = get_gemini_response(input_prompt, image_data, input)
         
         # Display the response in the app
         st.subheader("The Response is")
-        st.write(response)
+        st.write(response_text)
         
-        # Save response to S3
-        bucket_name = "gemini-app-responses"  # Replace with your S3 bucket name
-        
-        # Generate a unique and descriptive filename
-        if input:
-            file_name = f"response_{input[:20].replace(' ', '_')}.txt"  # Use a snippet of the input as filename
-        else:
-            # Fallback filename if no input provided
-            file_name = "response_default.txt"
-        
-        # Optionally: Generate a hash from the image file name if you want a unique file name
-        # image_hash = hashlib.md5(uploaded_file.name.encode()).hexdigest()
-        # file_name = f"response_{image_hash}.txt"
+        # Prepare the response for uploading to S3
+        response_data = {
+            "input": input,
+            "response": response_text
+        }
 
-        upload_to_s3(bucket_name, file_name, response)
+        # Upload the response to S3 as a JSON file
+        s3_key = f"data/response_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        upload_to_s3(response_data, s3_key=s3_key)
         
-        # Show success message
-        st.success(f"Response saved to S3 bucket: {bucket_name}, File: {file_name}")
+        # Notify user of success
+        st.success(f"Response saved to S3 bucket: {bucket_name}, File: {s3_key}")
     except Exception as e:
         st.error(f"Error: {e}")
