@@ -23,9 +23,12 @@ genai.configure(api_key=api_key)
 
 ## Function to load Gemini AI model and get responses
 def get_gemini_response(input, image, prompt):
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    response = model.generate_content([input, image[0], prompt])
-    return response.text
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content([input, image[0], prompt])
+        return response.text
+    except Exception as e:
+        raise ValueError(f"Error generating response from Gemini AI: {e}")
 
 ## Function to process uploaded images
 def input_image_setup(uploaded_file):
@@ -42,13 +45,17 @@ def input_image_setup(uploaded_file):
         raise FileNotFoundError("No file uploaded")
 
 ## Function to upload data to S3
-def upload_to_s3(bucket_name, file_name, data):
+def upload_to_s3(bucket_name, file_name, data, profile_name="Rahulsai"):
     try:
-        s3 = boto3.client('s3')
+        # Create a session using the specified profile
+        session = boto3.Session(profile_name=profile_name)
+        s3 = session.client('s3')
+        
+        # Upload the data to the S3 bucket
         s3.put_object(Bucket=bucket_name, Key=file_name, Body=data)
         print(f"File {file_name} successfully uploaded to {bucket_name}")
     except Exception as e:
-        print(f"Error uploading to S3: {e}")
+        raise ValueError(f"Error uploading to S3: {e}")
 
 ## Initializing Streamlit app
 st.set_page_config(page_title="Gemini Image Demo")
