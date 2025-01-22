@@ -5,6 +5,7 @@ import textwrap
 from PIL import Image
 from dotenv import load_dotenv
 import boto3
+import hashlib
 from datetime import datetime
 
 
@@ -91,8 +92,18 @@ if submit:
         
         # Save response to S3
         bucket_name = "gemini-app-responses"  # Replace with your S3 bucket name
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        file_name = f"response_{timestamp}.txt"
+        
+        # Generate a unique and descriptive filename
+        if input:
+            file_name = f"response_{input[:20].replace(' ', '_')}.txt"  # Use a snippet of the input as filename
+        else:
+            # Fallback filename if no input provided
+            file_name = "response_default.txt"
+        
+        # Optionally: Generate a hash from the image file name if you want a unique file name
+        # image_hash = hashlib.md5(uploaded_file.name.encode()).hexdigest()
+        # file_name = f"response_{image_hash}.txt"
+
         upload_to_s3(bucket_name, file_name, response)
         
         # Show success message
