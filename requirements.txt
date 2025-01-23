@@ -8,3 +8,4 @@ faiss-cpu
 google-generativeai
 google-ai-generativelanguage
 google-generative-ai
+boto3
