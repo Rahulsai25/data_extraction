@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 import json
-import boto3
+import pdf2image
 from PIL import Image
 from dotenv import load_dotenv
 from datetime import datetime
@@ -38,37 +38,28 @@ def input_image_setup(uploaded_file):
     else:
         raise FileNotFoundError("No file uploaded")
 
-# Function to upload file to S3
-def upload_to_s3(file_data, bucket_name="gemini-app-responses", s3_key="data/data1.json"):
-    try:
-        # Initialize boto3 client
-        s3_client = boto3.client('s3')
-
-        # Create the file locally (JSON format)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        file_path = f"response_{timestamp}.json"
-        
-        # Save the response as a JSON file
-        with open(file_path, 'w') as json_file:
-            json.dump(file_data, json_file)
-        
-        # Upload to S3
-        s3_client.upload_file(file_path, bucket_name, s3_key)
-        
-        print(f"File {file_path} uploaded successfully to {bucket_name} with key {s3_key}.")
-    except Exception as e:
-        print(f"Error uploading file to S3: {e}")
-
 ## Initializing Streamlit app
 st.set_page_config(page_title="Gemini Image Demo")
 
 st.header("Gemini Application")
 input = st.text_input("Input Prompt: ", key="input")
-uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png", "pdf"])
 image = ""   
+
 if uploaded_file is not None:
-    image = Image.open(uploaded_file)
-    st.image(image, caption="Uploaded Image.")
+    # If the uploaded file is a PDF, convert it to PNG
+    if uploaded_file.type == "application/pdf":
+        # Convert PDF to images (png format)
+        pages = pdf2image.convert_from_bytes(uploaded_file.read(), fmt="png")
+        # Save the first page as a PNG image (can handle more if needed)
+        image = pages[0]
+    else:
+        # Handle image files directly
+        image = Image.open(uploaded_file)
+    
+    # Proceed with your logic for the image
+    st.image(image, caption="Uploaded Image", use_column_width=True)
+
 
 submit = st.button("Tell me about the image")
 
@@ -89,17 +80,5 @@ if submit:
         st.subheader("The Response is")
         st.write(response_text)
         
-        # Prepare the response for uploading to S3
-        response_data = {
-            "input": input,
-            "response": response_text
-        }
-
-        # Upload the response to S3 as a JSON file
-        s3_key = f"data/response_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        upload_to_s3(response_data, s3_key=s3_key)
-        
-        # Notify user of success
-        st.success(f"Response saved to S3 bucket: {bucket_name}, File: {s3_key}")
     except Exception as e:
         st.error(f"Error: {e}")
