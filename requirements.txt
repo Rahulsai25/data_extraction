@@ -8,3 +8,4 @@ faiss-cpu
 google-generativeai
 google-ai-generativelanguage
 boto3
+pdf2image
