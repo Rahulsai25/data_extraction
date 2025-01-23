@@ -1,9 +1,10 @@
 import streamlit as st
 import os
-import pathlib
-import textwrap
+import json
+import boto3
 from PIL import Image
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
@@ -37,6 +38,27 @@ def input_image_setup(uploaded_file):
     else:
         raise FileNotFoundError("No file uploaded")
 
+# Function to upload file to S3
+def upload_to_s3(file_data, bucket_name="gemini-app-responses", s3_key="data/data1.json"):
+    try:
+        # Initialize boto3 client
+        s3_client = boto3.client('s3')
+
+        # Create the file locally (JSON format)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        file_path = f"response_{timestamp}.json"
+        
+        # Save the response as a JSON file
+        with open(file_path, 'w') as json_file:
+            json.dump(file_data, json_file)
+        
+        # Upload to S3
+        s3_client.upload_file(file_path, bucket_name, s3_key)
+        
+        print(f"File {file_path} uploaded successfully to {bucket_name} with key {s3_key}.")
+    except Exception as e:
+        print(f"Error uploading file to S3: {e}")
+
 ## Initializing Streamlit app
 st.set_page_config(page_title="Gemini Image Demo")
 
@@ -57,7 +79,27 @@ input_prompt = """
                """
 
 if submit:
-    image_data = input_image_setup(uploaded_file)
-    response = get_gemini_response(input_prompt, image_data, input)
-    st.subheader("The Response is")
-    st.write(response)
+    try:
+        image_data = input_image_setup(uploaded_file)
+        
+        # Get the Gemini AI response
+        response_text = get_gemini_response(input_prompt, image_data, input)
+        
+        # Display the response in the app
+        st.subheader("The Response is")
+        st.write(response_text)
+        
+        # Prepare the response for uploading to S3
+        response_data = {
+            "input": input,
+            "response": response_text
+        }
+
+        # Upload the response to S3 as a JSON file
+        s3_key = f"data/response_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        upload_to_s3(response_data, s3_key=s3_key)
+        
+        # Notify user of success
+        st.success(f"Response saved to S3 bucket: {bucket_name}, File: {s3_key}")
+    except Exception as e:
+        st.error(f"Error: {e}")
