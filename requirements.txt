@@ -8,4 +8,8 @@ faiss-cpu
 google-generativeai
 google-ai-generativelanguage
 google-generative-ai
+<<<<<<< HEAD
 boto3
+=======
+boto3
+>>>>>>> 176487cc12bc47623b041f15e5ebb7e4dfe00f7c
